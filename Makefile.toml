@@ -1,0 +1,21 @@
+[tasks.dev]
+install_crate = "cargo-watch"
+command = "cargo"
+args = ["watch", "-x", "run"]
+
+[tasks.dev-r]
+install_crate = "cargo-watch"
+command = "cargo"
+args = ["watch", "-x", "run --release"]
+
+[tasks.db-start]
+script_runner = "@shell"
+script = '''
+docker-compose up
+'''
+
+[tasks.db-stop]
+script_runner = "@shell"
+script = '''
+docker-compose stop
+'''
