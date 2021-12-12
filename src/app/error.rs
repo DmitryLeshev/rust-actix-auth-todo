@@ -8,6 +8,21 @@ use tracing::{error, info, warn};
 
 use super::response::ResponseStatus;
 
+// pub fn json_error(err: JsonPayloadError, _req: &HttpRequest) {
+//     let error = err.to_string();
+//     error::InternalError::from_response(
+//         err,
+//         HttpResponse::BadRequest()
+//             .json(AppErrorResponse {
+//                 code: 400,
+//                 error,
+//                 status: ResponseStatus::Fail,
+//             })
+//             .into(),
+//     )
+//     .into()
+// }
+
 #[derive(Debug, Serialize)]
 pub enum AppErrorType {
     DB,
@@ -70,6 +85,7 @@ impl AppError {
     pub const NOT_FOUND: AppErrorCode = AppErrorCode(404);
     pub const METHOD_NOT_ALLOWED: AppErrorCode = AppErrorCode(405);
     pub const UNPROCESSABLE_ENTITY: AppErrorCode = AppErrorCode(422);
+    pub const CRYPTO: AppErrorCode = AppErrorCode(500);
 
     pub fn with_cause(&self, error: String) -> Self {
         Self {
@@ -93,6 +109,7 @@ impl Serialize for AppErrorCode {
 impl ResponseError for AppError {
     fn status_code(&self) -> StatusCode {
         match self.code {
+            AppError::CRYPTO => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::DB_ERROR => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::NOT_FOUND => StatusCode::NOT_FOUND,
             AppError::BAD_REQUEST => StatusCode::BAD_REQUEST,
@@ -139,5 +156,17 @@ impl From<AppErrorCode> for AppError {
 impl From<sqlx::Error> for AppError {
     fn from(error: sqlx::Error) -> AppError {
         AppError::DB_ERROR.default().with_cause(error.to_string())
+    }
+}
+
+impl From<serde_json::Error> for AppError {
+    fn from(error: serde_json::Error) -> AppError {
+        AppError::BAD_REQUEST.message(error.to_string())
+    }
+}
+
+impl From<argonautica::Error> for AppError {
+    fn from(error: argonautica::Error) -> AppError {
+        AppError::CRYPTO.message(error.to_string())
     }
 }

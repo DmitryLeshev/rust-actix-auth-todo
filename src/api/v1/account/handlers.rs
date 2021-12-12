@@ -7,8 +7,9 @@ use crate::app::{
 
 use super::{
     models::{
-        AccountId, DTOCreateAccount, DTOGetAccounts, QuerySearchAccounts, ResponseAccount,
-        ResponseGetAccountById, ResponseGetAccounts,
+        AccountId, DTOCreateAccount, DTOGetAccounts, DTOUpdateAccount, QuerySearchAccounts,
+        ResponseAccount, ResponseCreateAccount, ResponseGetAccountById, ResponseGetAccounts,
+        ResponseUpdateAccount,
     },
     service::AccountService,
     PATH,
@@ -55,19 +56,44 @@ pub async fn get_account_by_id(
         .with_data(data)
         .send())
 }
-pub async fn delete_account(account_id: web::Path<AccountId>) -> AppResponse {
-    println!("{}", account_id);
-    Ok(ClientResponse::<ResponseAccount>::default())
+pub async fn delete_account(
+    account_id: web::Path<AccountId>,
+    service: AccountService,
+) -> AppResponse {
+    service.delete_account(*account_id).await?;
+    Ok(ClientResponse::<ResponseAccount>::build()
+        .with_status(StatusCode::OK)
+        .with_message(format!("Аккаунт с айди = {} был удалён", account_id))
+        .send())
 }
-pub async fn create_account(dto: web::Json<DTOCreateAccount>) -> AppResponse {
-    println!("{:?}", dto);
-    Ok(ClientResponse::<ResponseAccount>::default())
+pub async fn create_account(
+    dto: web::Json<DTOCreateAccount>,
+    service: AccountService,
+) -> AppResponse {
+    let new_account = service.create_account(dto.clone()).await?;
+    // + Header -> Location = uri new account
+    Ok(ClientResponse::<ResponseCreateAccount>::build()
+        .with_status(StatusCode::CREATED)
+        .with_message(format!("Аккаунт успешно создан"))
+        .with_data(new_account)
+        .send())
 }
-pub async fn update_account(account_id: web::Path<AccountId>) -> AppResponse {
-    println!("{}", account_id);
-    Ok(ClientResponse::<ResponseAccount>::default())
+pub async fn update_account(
+    dto: web::Json<DTOUpdateAccount>,
+    service: AccountService,
+) -> AppResponse {
+    let update_account = service.update_account(dto.clone()).await?;
+    // + Header -> Location = uri new account
+    Ok(ClientResponse::<ResponseUpdateAccount>::build()
+        .with_status(StatusCode::CREATED)
+        .with_message(format!("Аккаунт успешно изменён"))
+        .with_data(update_account)
+        .send())
 }
-pub async fn ban_account(account_id: web::Path<AccountId>) -> AppResponse {
-    println!("{}", account_id);
-    Ok(ClientResponse::<ResponseAccount>::default())
+pub async fn ban_account(account_id: web::Path<AccountId>, service: AccountService) -> AppResponse {
+    service.ban_account(*account_id).await?;
+    Ok(ClientResponse::<ResponseAccount>::build()
+        .with_status(StatusCode::OK)
+        .with_message(format!("Аккаунт с айди = {} был забанен", account_id))
+        .send())
 }

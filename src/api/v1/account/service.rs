@@ -8,21 +8,27 @@ use tracing::instrument;
 
 use crate::{
     app::{error::AppError, state::AppState},
-    common::models::Pagination,
+    common::{models::Pagination, services::CryptoService},
 };
 
 use super::{
-    models::{Account, DTOGetAccounts, ResponseGetAccounts},
+    models::{
+        Account, AccountId, DTOCreateAccount, DTOGetAccounts, DTOUpdateAccount, ResponseGetAccounts,
+    },
     repository::AccountRepository,
 };
 
 pub struct AccountService {
     repository: Arc<AccountRepository>,
+    crypto_service: Arc<CryptoService>,
 }
 
 impl AccountService {
-    fn new(repository: Arc<AccountRepository>) -> Self {
-        Self { repository }
+    fn new(repository: Arc<AccountRepository>, crypto_service: Arc<CryptoService>) -> Self {
+        Self {
+            repository,
+            crypto_service,
+        }
     }
     pub async fn _get_all(&self) -> Result<Vec<Account>, AppError> {
         Ok(self.repository._get_all().await?)
@@ -69,8 +75,32 @@ impl AccountService {
         Ok(data)
     }
 
-    pub async fn get_account_by_id(&self, account_id: i64) -> Result<Account, AppError> {
+    pub async fn get_account_by_id(&self, account_id: AccountId) -> Result<Account, AppError> {
         Ok(self.repository.get_by_id(account_id).await?)
+    }
+
+    pub async fn delete_account(&self, account_id: AccountId) -> Result<(), AppError> {
+        self.repository.delete(account_id).await?;
+        Ok(())
+    }
+    pub async fn create_account(&self, mut dto: DTOCreateAccount) -> Result<Account, AppError> {
+        // Валидация данных todo!
+
+        let account = self.repository.get_by_email(dto.email.clone()).await;
+        if let Ok(account) = account {
+            return Err(
+                AppError::BAD_REQUEST.message(format!("Такой email({}), уже занят", account.email))
+            );
+        };
+
+        dto.hash_password = self.crypto_service.hash_password(dto.hash_password).await?;
+        Ok(self.repository.create(dto).await?)
+    }
+    pub async fn update_account(&self, dto: DTOUpdateAccount) -> Result<Account, AppError> {
+        Ok(Account::default())
+    }
+    pub async fn ban_account(&self, account_id: AccountId) -> Result<Account, AppError> {
+        Ok(Account::default())
     }
 }
 
@@ -83,13 +113,20 @@ impl FromRequest for AccountService {
         payload: &mut actix_web::dev::Payload,
     ) -> Self::Future {
         let app_state_result = Data::<AppState>::from_request(req, payload).into_inner();
-
+        let crypto_service_result = Data::<CryptoService>::from_request(req, payload).into_inner();
         match app_state_result {
-            Ok(app_state) => {
-                let pool = app_state.deref().pool.clone();
-                let repo = AccountRepository::new(Arc::new(pool));
-                ready(Ok(AccountService::new(Arc::new(repo))))
-            }
+            Ok(app_state) => match crypto_service_result {
+                Ok(crypto_service) => {
+                    let pool = app_state.deref().pool.clone();
+                    let repo = AccountRepository::new(Arc::new(pool));
+                    let crypto_service = crypto_service.deref().clone();
+                    ready(Ok(AccountService::new(Arc::new(repo), crypto_service)))
+                }
+                Err(e) => ready(Err(AppError::DB_ERROR.default().with_cause(format!(
+                    "[CryproService] Initialization error: {}",
+                    e.to_string()
+                )))),
+            },
             Err(e) => ready(Err(AppError::DB_ERROR.default().with_cause(format!(
                 "[AccountService] Initialization error: {}",
                 e.to_string()

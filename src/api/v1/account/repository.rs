@@ -12,7 +12,7 @@ use crate::{
     common::models::RowCount,
 };
 
-use super::models::Account;
+use super::models::{Account, AccountId, DTOCreateAccount};
 
 pub struct AccountRepository {
     pool: Arc<Pool<Postgres>>,
@@ -65,7 +65,7 @@ impl AccountRepository {
         Ok(accounts)
     }
 
-    pub async fn get_by_id(&self, account_id: i64) -> Result<Account, AppError> {
+    pub async fn get_by_id(&self, account_id: AccountId) -> Result<Account, AppError> {
         let sql = format!("select * from account where account_id = {}", account_id);
         let account = sqlx::query_as::<_, Account>(&sql)
             .fetch_one(&*self.pool)
@@ -76,6 +76,48 @@ impl AccountRepository {
                 .message(format!("Аккаунта с id = {} не найден!", account_id))
                 .with_cause(e.to_string())),
         }
+    }
+
+    pub async fn get_by_email(&self, email: String) -> Result<Account, AppError> {
+        let sql = format!("select * from account where email = '{}'", email);
+        let account = sqlx::query_as::<_, Account>(&sql)
+            .fetch_one(&*self.pool)
+            .await?;
+        Ok(account)
+    }
+
+    pub async fn create(&self, dto: DTOCreateAccount) -> Result<Account, AppError> {
+        let sql = format!("insert into account (email, first_name, last_name, hash_password) values ('{}', '{}', '{}', '{}') returning *", dto.email, dto.first_name, dto.last_name, dto.hash_password);
+        // sqlx::query(&sql).execute(&*self.pool).await?;
+        let account = sqlx::query_as::<_, Account>(&sql)
+            .fetch_one(&*self.pool)
+            .await?;
+        let sql = format!(
+            "insert into account_role (account_id, role_id) values ({}, 2)",
+            account.account_id
+        );
+        sqlx::query(&sql).execute(&*self.pool).await?;
+        Ok(account)
+    }
+
+    pub async fn delete(&self, account_id: AccountId) -> Result<(), AppError> {
+        let sql = format!("delete from account where account_id = {}", account_id);
+        sqlx::query(&sql).execute(&*self.pool).await?;
+        Ok(())
+    }
+
+    pub async fn update(&self) -> Result<Vec<Account>, AppError> {
+        let accounts = sqlx::query_as::<_, Account>("select * from account")
+            .fetch_all(&*self.pool)
+            .await?;
+        Ok(accounts)
+    }
+
+    pub async fn ban_account(&self) -> Result<Vec<Account>, AppError> {
+        let accounts = sqlx::query_as::<_, Account>("select * from account")
+            .fetch_all(&*self.pool)
+            .await?;
+        Ok(accounts)
     }
 }
 
