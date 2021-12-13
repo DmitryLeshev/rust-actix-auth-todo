@@ -37,7 +37,7 @@ impl Default for Account {
 }
 
 impl Account {
-    pub fn new(dto: DTOCreateAccount) -> Self {
+    pub fn _new(dto: DTOCreateAccount) -> Self {
         let now = Utc::now().naive_utc();
         Self {
             account_id: 12345,

@@ -1,6 +1,7 @@
 use actix_web::{web::Data, FromRequest};
 use sqlx::{Pool, Postgres};
 use std::{
+    collections::HashMap,
     future::{ready, Ready},
     ops::Deref,
     sync::Arc,
@@ -9,10 +10,10 @@ use tracing::instrument;
 
 use crate::{
     app::{error::AppError, state::AppState},
-    common::models::RowCount,
+    common::models::{Role, RowCount},
 };
 
-use super::models::{Account, AccountId, DTOCreateAccount};
+use super::models::{Account, AccountId, DTOCreateAccount, DTOUpdateAccount};
 
 pub struct AccountRepository {
     pool: Arc<Pool<Postgres>>,
@@ -88,15 +89,17 @@ impl AccountRepository {
 
     pub async fn create(&self, dto: DTOCreateAccount) -> Result<Account, AppError> {
         let sql = format!("insert into account (email, first_name, last_name, hash_password) values ('{}', '{}', '{}', '{}') returning *", dto.email, dto.first_name, dto.last_name, dto.hash_password);
-        // sqlx::query(&sql).execute(&*self.pool).await?;
         let account = sqlx::query_as::<_, Account>(&sql)
             .fetch_one(&*self.pool)
             .await?;
-        let sql = format!(
-            "insert into account_role (account_id, role_id) values ({}, 2)",
-            account.account_id
-        );
-        sqlx::query(&sql).execute(&*self.pool).await?;
+        if let Some(role) = dto.role {
+            self.add_role(account.account_id, role).await?;
+        };
+        // let sql = format!(
+        //     "insert into account_role (account_id, role_id) values ({}, {})",
+        //     account.account_id, role_id
+        // );
+        // sqlx::query(&sql).execute(&*self.pool).await?;
         Ok(account)
     }
 
@@ -106,14 +109,62 @@ impl AccountRepository {
         Ok(())
     }
 
-    pub async fn update(&self) -> Result<Vec<Account>, AppError> {
-        let accounts = sqlx::query_as::<_, Account>("select * from account")
-            .fetch_all(&*self.pool)
+    pub async fn update(
+        &self,
+        account_id: AccountId,
+        dto: DTOUpdateAccount,
+    ) -> Result<Account, AppError> {
+        let sql = {
+            let mut hash_map = HashMap::new();
+            if let Some(email) = dto.email {
+                hash_map.insert("email", email);
+            };
+            if let Some(first_name) = dto.first_name {
+                hash_map.insert("first_name", first_name);
+            };
+            if let Some(last_name) = dto.last_name {
+                hash_map.insert("last_name", last_name);
+            };
+            hash_map
+                .iter()
+                .map(|(key, value)| format!("{} = '{}'", key, value))
+                .collect::<Vec<String>>()
+                .join(", ")
+        };
+        let sql = format!(
+            "update account set {} where account_id = {} returning *",
+            sql, account_id
+        );
+        let account = sqlx::query_as::<_, Account>(&sql)
+            .fetch_one(&*self.pool)
             .await?;
-        Ok(accounts)
+        if let Some(role) = dto.role {
+            self.update_role(account_id, role).await?
+        };
+        Ok(account)
     }
 
-    pub async fn ban_account(&self) -> Result<Vec<Account>, AppError> {
+    pub async fn add_role(&self, account_id: AccountId, role: Role) -> Result<(), AppError> {
+        let sql = format!(
+            "insert into account_role (account_id, role_id) values ({}, {})",
+            account_id,
+            role.get_role_id()
+        );
+        sqlx::query(&sql).execute(&*self.pool).await?;
+        Ok(())
+    }
+
+    pub async fn update_role(&self, account_id: AccountId, role: Role) -> Result<(), AppError> {
+        let sql = format!(
+            "update account_role set role_id = {} where account_id = {}",
+            role.get_role_id(),
+            account_id,
+        );
+        sqlx::query(&sql).execute(&*self.pool).await?;
+        Ok(())
+    }
+
+    pub async fn _ban_account(&self) -> Result<Vec<Account>, AppError> {
         let accounts = sqlx::query_as::<_, Account>("select * from account")
             .fetch_all(&*self.pool)
             .await?;

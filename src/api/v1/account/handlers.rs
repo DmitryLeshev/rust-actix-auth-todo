@@ -79,10 +79,11 @@ pub async fn create_account(
         .send())
 }
 pub async fn update_account(
+    account_id: web::Path<AccountId>,
     dto: web::Json<DTOUpdateAccount>,
     service: AccountService,
 ) -> AppResponse {
-    let update_account = service.update_account(dto.clone()).await?;
+    let update_account = service.update_account(*account_id, dto.clone()).await?;
     // + Header -> Location = uri new account
     Ok(ClientResponse::<ResponseUpdateAccount>::build()
         .with_status(StatusCode::CREATED)

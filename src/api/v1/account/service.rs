@@ -5,6 +5,7 @@ use std::{
     sync::Arc,
 };
 use tracing::instrument;
+use validator::Validate;
 
 use crate::{
     app::{error::AppError, state::AppState},
@@ -84,22 +85,77 @@ impl AccountService {
         Ok(())
     }
     pub async fn create_account(&self, mut dto: DTOCreateAccount) -> Result<Account, AppError> {
-        // Валидация данных todo!
+        match dto.validate() {
+            Ok(_) => Ok(()),
+            Err(errors) => {
+                let error_map = errors.field_errors();
 
+                let message = if error_map.contains_key("first_name") {
+                    format!("Invalid first name. \"{}\" is too short.", dto.first_name)
+                } else if error_map.contains_key("last_name") {
+                    format!("Invalid last name. \"{}\" is too short.", dto.last_name)
+                } else if error_map.contains_key("hash_password") {
+                    format!("Invalid password. \"{}\"", dto.hash_password)
+                } else if error_map.contains_key("email") {
+                    format!("Invalid email address \"{}\"", dto.email)
+                } else {
+                    "Invalid input.".to_string()
+                };
+
+                Err(AppError::BAD_REQUEST.message(message))
+            }
+        }?;
         let account = self.repository.get_by_email(dto.email.clone()).await;
         if let Ok(account) = account {
             return Err(
                 AppError::BAD_REQUEST.message(format!("Такой email({}), уже занят", account.email))
             );
         };
-
         dto.hash_password = self.crypto_service.hash_password(dto.hash_password).await?;
         Ok(self.repository.create(dto).await?)
     }
-    pub async fn update_account(&self, dto: DTOUpdateAccount) -> Result<Account, AppError> {
-        Ok(Account::default())
+    pub async fn update_account(
+        &self,
+        account_id: AccountId,
+        dto: DTOUpdateAccount,
+    ) -> Result<Account, AppError> {
+        if let (None, None, None, None) = (
+            dto.last_name.clone(),
+            dto.first_name.clone(),
+            dto.email.clone(),
+            dto.role.clone(),
+        ) {
+            return Err(AppError::BAD_REQUEST
+                .message("Нужно указать хотя-бы одно поле для изменения".to_string()));
+        };
+        match dto.validate() {
+            Ok(_) => Ok(()),
+            Err(errors) => {
+                let error_map = errors.field_errors();
+
+                let message = if error_map.contains_key("first_name") {
+                    format!(
+                        "Invalid first name. \"{}\" is too short.",
+                        dto.first_name.as_ref().unwrap()
+                    )
+                } else if error_map.contains_key("last_name") {
+                    format!(
+                        "Invalid last name. \"{}\" is too short.",
+                        dto.last_name.as_ref().unwrap()
+                    )
+                } else if error_map.contains_key("email") {
+                    format!("Invalid email address \"{}\"", dto.email.as_ref().unwrap())
+                } else {
+                    "Invalid input.".to_string()
+                };
+
+                Err(AppError::BAD_REQUEST.message(message))
+            }
+        }?;
+        let account = self.repository.update(account_id, dto).await?;
+        Ok(account)
     }
-    pub async fn ban_account(&self, account_id: AccountId) -> Result<Account, AppError> {
+    pub async fn ban_account(&self, _account_id: AccountId) -> Result<Account, AppError> {
         Ok(Account::default())
     }
 }
