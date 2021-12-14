@@ -11,7 +11,7 @@ struct TestResponse {
     test: String,
 }
 
-pub async fn test_response(req: HttpRequest) -> AppResponse {
+pub async fn _test_response(req: HttpRequest) -> AppResponse {
     let name = req
         .match_info()
         .get("name")

@@ -2,15 +2,15 @@ mod api;
 mod app;
 mod common;
 mod config;
-mod session;
 
+use actix_identity::{CookieIdentityPolicy, IdentityService};
+use actix_session::CookieSession;
 use std::sync::{
     atomic::{AtomicU16, Ordering},
-    Arc, RwLock,
+    Arc,
 };
 
 use actix_cors::Cors;
-use actix_identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::{
     error,
     web::{self},
@@ -18,12 +18,7 @@ use actix_web::{
 };
 
 use crate::app::error::AppErrorResponse;
-use crate::{
-    app::state::AppState,
-    common::{handlers::*, services::*},
-    config::AppConfig,
-    session::Sessions,
-};
+use crate::{app::state::AppState, common::services::*, config::AppConfig};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -34,10 +29,7 @@ async fn main() -> std::io::Result<()> {
     let pool = config.db.pg.db_pool().await;
     let thread_counter = Arc::new(AtomicU16::new(1));
 
-    let hashing = CryptoService {
-        key: Arc::new("TEST".to_string()),
-    };
-
+    let hashing = CryptoService::new("QWERTY".to_string());
     HttpServer::new(move || {
         let thread_index = thread_counter.fetch_add(1, Ordering::SeqCst);
         tracing::debug!("Starting thread {}", thread_index);
@@ -64,22 +56,21 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(hashing.clone()))
             .app_data(web::Data::new(AppState {
                 pool: pool.clone(),
-                sessions: RwLock::new(Sessions::default()),
                 thread_id: thread_index,
                 domain: domain.clone(),
                 version: 1,
             }))
+            .wrap(
+                CookieSession::signed(&[0; 32])
+                    .name("CookieSession")
+                    .secure(false),
+            )
             .wrap(IdentityService::new(
                 CookieIdentityPolicy::new(&[0; 32])
-                    .name("test")
+                    .name("IdentityServiceCookieIdentityPolicy")
                     .secure(false),
             ))
             .wrap(Cors::permissive())
-            .route("/", web::get().to(greet))
-            .route("/test", web::get().to(test_response))
-            .route("/test/{name}", web::get().to(test_response))
-            .route("/check-session", web::get().to(check_session_user))
-            .route("/create-session", web::get().to(create_session))
             .configure(api::app_routing)
     })
     .workers(config.server.workers)

@@ -15,11 +15,18 @@ impl Default for Role {
 }
 
 impl Role {
-    pub fn get_role_id(&self) -> i64 {
+    pub fn get_id(&self) -> i64 {
         match self {
             Role::Admin => 1,
             Role::User => 2,
             Role::Guest => 3,
+        }
+    }
+    pub fn new_by_id(role_id: i64) -> Self {
+        match role_id {
+            1 => Role::Admin,
+            2 => Role::User,
+            _ => Role::Guest,
         }
     }
 }

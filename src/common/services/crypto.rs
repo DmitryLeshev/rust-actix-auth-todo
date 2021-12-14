@@ -10,6 +10,10 @@ pub struct CryptoService {
 }
 
 impl CryptoService {
+    pub fn new(key: String) -> Self {
+        Self { key: Arc::new(key) }
+    }
+
     #[instrument(skip(self, password), err)]
     pub async fn hash_password(&self, password: String) -> Result<String, AppError> {
         let hash = Hasher::default()

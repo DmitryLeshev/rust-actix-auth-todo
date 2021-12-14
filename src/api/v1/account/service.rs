@@ -9,7 +9,10 @@ use validator::Validate;
 
 use crate::{
     app::{error::AppError, state::AppState},
-    common::{models::Pagination, services::CryptoService},
+    common::{
+        models::{Pagination, Role},
+        services::CryptoService,
+    },
 };
 
 use super::{
@@ -25,7 +28,7 @@ pub struct AccountService {
 }
 
 impl AccountService {
-    fn new(repository: Arc<AccountRepository>, crypto_service: Arc<CryptoService>) -> Self {
+    pub fn new(repository: Arc<AccountRepository>, crypto_service: Arc<CryptoService>) -> Self {
         Self {
             repository,
             crypto_service,
@@ -80,7 +83,16 @@ impl AccountService {
         Ok(self.repository.get_by_id(account_id).await?)
     }
 
+    pub async fn get_account_by_email(&self, email: String) -> Result<Account, AppError> {
+        Ok(self.repository.get_by_email(email).await?)
+    }
+
+    pub async fn get_role(&self, account_id: AccountId) -> Result<Role, AppError> {
+        Ok(self.repository.get_role(account_id).await?)
+    }
+
     pub async fn delete_account(&self, account_id: AccountId) -> Result<(), AppError> {
+        self.repository.get_by_id(account_id).await?;
         self.repository.delete(account_id).await?;
         Ok(())
     }
@@ -152,6 +164,13 @@ impl AccountService {
                 Err(AppError::BAD_REQUEST.message(message))
             }
         }?;
+        if let Some(email) = dto.email.clone() {
+            let account = self.repository.get_by_email(email).await;
+            if let Ok(account) = account {
+                return Err(AppError::BAD_REQUEST
+                    .message(format!("Такой email({}), уже занят", account.email)));
+            };
+        };
         let account = self.repository.update(account_id, dto).await?;
         Ok(account)
     }

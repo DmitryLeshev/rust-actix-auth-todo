@@ -77,7 +77,7 @@ impl AppErrorCode {
 }
 
 impl AppError {
-    // pub const INTERNAL_SERVER_ERROR: AppErrorCode = AppErrorCode(500);
+    pub const INTERNAL_SERVER_ERROR: AppErrorCode = AppErrorCode(500);
     pub const DB_ERROR: AppErrorCode = AppErrorCode(500);
     pub const BAD_REQUEST: AppErrorCode = AppErrorCode(400);
     pub const UNAUTHORIZED: AppErrorCode = AppErrorCode(401);
@@ -109,6 +109,7 @@ impl Serialize for AppErrorCode {
 impl ResponseError for AppError {
     fn status_code(&self) -> StatusCode {
         match self.code {
+            AppError::INTERNAL_SERVER_ERROR => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::CRYPTO => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::DB_ERROR => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::NOT_FOUND => StatusCode::NOT_FOUND,
@@ -167,6 +168,12 @@ impl From<serde_json::Error> for AppError {
 
 impl From<argonautica::Error> for AppError {
     fn from(error: argonautica::Error) -> AppError {
+        AppError::CRYPTO.message(error.to_string())
+    }
+}
+
+impl From<actix_web::error::Error> for AppError {
+    fn from(error: actix_web::error::Error) -> AppError {
         AppError::CRYPTO.message(error.to_string())
     }
 }

@@ -13,7 +13,7 @@ use crate::{
     common::models::{Role, RowCount},
 };
 
-use super::models::{Account, AccountId, DTOCreateAccount, DTOUpdateAccount};
+use super::models::{Account, AccountId, AccountRole, DTOCreateAccount, DTOUpdateAccount};
 
 pub struct AccountRepository {
     pool: Arc<Pool<Postgres>>,
@@ -83,8 +83,13 @@ impl AccountRepository {
         let sql = format!("select * from account where email = '{}'", email);
         let account = sqlx::query_as::<_, Account>(&sql)
             .fetch_one(&*self.pool)
-            .await?;
-        Ok(account)
+            .await;
+        match account {
+            Ok(account) => Ok(account),
+            Err(e) => Err(AppError::NOT_FOUND
+                .message(format!("Аккаунта с email = {} не найден!", email))
+                .with_cause(e.to_string())),
+        }
     }
 
     pub async fn create(&self, dto: DTOCreateAccount) -> Result<Account, AppError> {
@@ -94,12 +99,9 @@ impl AccountRepository {
             .await?;
         if let Some(role) = dto.role {
             self.add_role(account.account_id, role).await?;
+        } else {
+            self.add_role(account.account_id, Role::User).await?;
         };
-        // let sql = format!(
-        //     "insert into account_role (account_id, role_id) values ({}, {})",
-        //     account.account_id, role_id
-        // );
-        // sqlx::query(&sql).execute(&*self.pool).await?;
         Ok(account)
     }
 
@@ -148,16 +150,32 @@ impl AccountRepository {
         let sql = format!(
             "insert into account_role (account_id, role_id) values ({}, {})",
             account_id,
-            role.get_role_id()
+            role.get_id()
         );
         sqlx::query(&sql).execute(&*self.pool).await?;
         Ok(())
     }
 
+    pub async fn get_role(&self, account_id: AccountId) -> Result<Role, AppError> {
+        let sql = format!(
+            "select * from account_role where account_id = {}",
+            account_id
+        );
+        let account_role = sqlx::query_as::<_, AccountRole>(&sql)
+            .fetch_one(&*self.pool)
+            .await;
+        match account_role {
+            Ok(a_r) => Ok(Role::new_by_id(a_r.role_id)),
+            Err(e) => Err(AppError::NOT_FOUND
+                .message(format!("Аккаунта с id = {} не найден!", account_id))
+                .with_cause(e.to_string())),
+        }
+    }
+
     pub async fn update_role(&self, account_id: AccountId, role: Role) -> Result<(), AppError> {
         let sql = format!(
             "update account_role set role_id = {} where account_id = {}",
-            role.get_role_id(),
+            role.get_id(),
             account_id,
         );
         sqlx::query(&sql).execute(&*self.pool).await?;
