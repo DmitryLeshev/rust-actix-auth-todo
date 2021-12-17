@@ -7,7 +7,7 @@ use std::{
 };
 use tracing::instrument;
 
-use crate::app::error::AppError;
+use crate::{app::error::AppError, common::models::SessionAccount};
 
 pub struct SessionService {
     pub session: Session,
@@ -36,8 +36,24 @@ impl SessionService {
         todo!()
     }
 
-    pub async fn _get_session() {
-        todo!()
+    pub async fn get_session_account(&self) -> Result<SessionAccount, AppError> {
+        if let Some(identity) = self.identity.identity() {
+            if let Some(data) = self.session.get::<SessionAccount>(&identity)? {
+                return Ok(data);
+            }
+        }
+        Err(AppError::UNAUTHORIZED.default())
+    }
+
+    pub async fn get_session_account_id(&self) -> Result<i64, AppError> {
+        if let Some(identity) = self.identity.identity() {
+            if let Some(data) = self.session.get::<SessionAccount>(&identity)? {
+                if let Some(account_id) = data.account_id {
+                    return Ok(account_id);
+                }
+            }
+        }
+        Err(AppError::UNAUTHORIZED.default())
     }
 }
 

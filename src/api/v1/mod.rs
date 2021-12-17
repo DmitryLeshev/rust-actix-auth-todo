@@ -1,5 +1,6 @@
 pub mod account;
 pub mod auth;
+pub mod todo;
 
 use actix_web::{
     web::{self, ServiceConfig},
@@ -15,6 +16,7 @@ pub fn v1_routing(cfg: &mut ServiceConfig) {
         web::scope("/v1")
             .route("", web::get().to(api_methods))
             .configure(account::routing)
+            .configure(todo::routing)
             .configure(auth::routing),
     );
 }

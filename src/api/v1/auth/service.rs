@@ -13,25 +13,16 @@ use crate::{
     common::{models::Role, services::CryptoService},
 };
 
-use super::{
-    models::{DTORegistration, DTOSignIn},
-    repository::AuthRepository,
-};
+use super::models::{DTORegistration, DTOSignIn};
 
 pub struct AuthService {
-    repository: Arc<AuthRepository>,
     account_service: Arc<AccountService>,
     crypto_service: Arc<CryptoService>,
 }
 
 impl AuthService {
-    pub fn new(
-        repository: Arc<AuthRepository>,
-        account_service: Arc<AccountService>,
-        crypto_service: Arc<CryptoService>,
-    ) -> Self {
+    pub fn new(account_service: Arc<AccountService>, crypto_service: Arc<CryptoService>) -> Self {
         Self {
-            repository,
             account_service,
             crypto_service,
         }
@@ -65,18 +56,10 @@ impl AuthService {
         }
     }
 
-    pub async fn _sign_out(&self) -> Result<(), AppError> {
-        Ok(())
-    }
-
     pub async fn registration(&self, dto: DTORegistration) -> Result<(Account, Role), AppError> {
         let account = self.account_service.create_account(dto).await?;
         let role = self.account_service.get_role(account.account_id).await?;
         Ok((account, role))
-    }
-
-    pub async fn _session_info(&self) -> Result<(), AppError> {
-        Ok(())
     }
 }
 
@@ -90,29 +73,19 @@ impl FromRequest for AuthService {
     ) -> Self::Future {
         let app_state_result = Data::<AppState>::from_request(req, payload).into_inner();
         let crypto_service_result = Data::<CryptoService>::from_request(req, payload).into_inner();
-        match app_state_result {
-            Ok(app_state) => match crypto_service_result {
-                Ok(crypto_service) => {
-                    let pool = app_state.deref().pool.clone();
-                    let account_repo = Arc::new(AccountRepository::new(Arc::new(pool.clone())));
-                    let auth_repo = Arc::new(AuthRepository::new(Arc::new(pool)));
 
-                    let crypto_service = crypto_service.deref().clone();
-                    let account_service =
-                        Arc::new(AccountService::new(account_repo, crypto_service.clone()));
-                    let auth_service = AuthService::new(auth_repo, account_service, crypto_service);
+        if let (Ok(app_state), Ok(crypto_service)) = (app_state_result, crypto_service_result) {
+            let pool = app_state.deref().pool.clone();
+            let repo = AccountRepository::new(Arc::new(pool.clone()));
 
-                    ready(Ok(auth_service))
-                }
-                Err(e) => ready(Err(AppError::DB_ERROR.default().with_cause(format!(
-                    "[CryproService] Initialization error: {}",
-                    e.to_string()
-                )))),
-            },
-            Err(e) => ready(Err(AppError::DB_ERROR.default().with_cause(format!(
-                "[AccountService] Initialization error: {}",
-                e.to_string()
-            )))),
+            let crypto_service = crypto_service.deref().clone();
+            let account_service = AccountService::new(Arc::new(repo), crypto_service.clone());
+            let auth_service = AuthService::new(Arc::new(account_service), crypto_service);
+            return ready(Ok(auth_service));
+        } else {
+            return ready(Err(AppError::SERVICE_ERROR
+                .default()
+                .with_cause("[AuthService] Initialization error".to_string())));
         }
     }
 }

@@ -14,7 +14,7 @@ pub struct SessionData {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct SessionUser {
+pub struct SessionAccount {
     pub session_id: String,
     pub account_id: Option<i64>,
     pub token: Option<String>,
@@ -22,7 +22,7 @@ pub struct SessionUser {
     pub data: SessionData,
 }
 
-impl Default for SessionUser {
+impl Default for SessionAccount {
     fn default() -> Self {
         Self {
             session_id: String::from("Default"),
@@ -34,7 +34,7 @@ impl Default for SessionUser {
     }
 }
 
-impl SessionUser {
+impl SessionAccount {
     pub fn new(session_id: String, account: Account, role: Role, ip: IpAddr) -> Self {
         Self {
             session_id,

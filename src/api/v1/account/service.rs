@@ -189,23 +189,16 @@ impl FromRequest for AccountService {
     ) -> Self::Future {
         let app_state_result = Data::<AppState>::from_request(req, payload).into_inner();
         let crypto_service_result = Data::<CryptoService>::from_request(req, payload).into_inner();
-        match app_state_result {
-            Ok(app_state) => match crypto_service_result {
-                Ok(crypto_service) => {
-                    let pool = app_state.deref().pool.clone();
-                    let repo = AccountRepository::new(Arc::new(pool));
-                    let crypto_service = crypto_service.deref().clone();
-                    ready(Ok(AccountService::new(Arc::new(repo), crypto_service)))
-                }
-                Err(e) => ready(Err(AppError::DB_ERROR.default().with_cause(format!(
-                    "[CryproService] Initialization error: {}",
-                    e.to_string()
-                )))),
-            },
-            Err(e) => ready(Err(AppError::DB_ERROR.default().with_cause(format!(
-                "[AccountService] Initialization error: {}",
-                e.to_string()
-            )))),
+
+        if let (Ok(app_state), Ok(crypto_service)) = (app_state_result, crypto_service_result) {
+            let pool = app_state.deref().pool.clone();
+            let repo = AccountRepository::new(Arc::new(pool));
+            let crypto_service = crypto_service.deref().clone();
+            return ready(Ok(AccountService::new(Arc::new(repo), crypto_service)));
+        } else {
+            return ready(Err(AppError::SERVICE_ERROR
+                .default()
+                .with_cause("[AccountService] Initialization error".to_string())));
         }
     }
 }

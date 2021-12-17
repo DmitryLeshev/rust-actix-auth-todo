@@ -78,6 +78,7 @@ impl AppErrorCode {
 
 impl AppError {
     pub const INTERNAL_SERVER_ERROR: AppErrorCode = AppErrorCode(500);
+    pub const SERVICE_ERROR: AppErrorCode = AppErrorCode(500);
     pub const DB_ERROR: AppErrorCode = AppErrorCode(500);
     pub const BAD_REQUEST: AppErrorCode = AppErrorCode(400);
     pub const UNAUTHORIZED: AppErrorCode = AppErrorCode(401);
@@ -110,8 +111,6 @@ impl ResponseError for AppError {
     fn status_code(&self) -> StatusCode {
         match self.code {
             AppError::INTERNAL_SERVER_ERROR => StatusCode::INTERNAL_SERVER_ERROR,
-            AppError::CRYPTO => StatusCode::INTERNAL_SERVER_ERROR,
-            AppError::DB_ERROR => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::NOT_FOUND => StatusCode::NOT_FOUND,
             AppError::BAD_REQUEST => StatusCode::BAD_REQUEST,
             AppError::UNAUTHORIZED => StatusCode::UNAUTHORIZED,

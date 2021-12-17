@@ -6,7 +6,7 @@ use crate::{
         error::AppError,
         response::{AppResponse, ClientResponse},
     },
-    common::{models::SessionUser, services::SessionService},
+    common::{models::SessionAccount, services::SessionService},
 };
 
 use super::{
@@ -20,13 +20,14 @@ pub async fn sign_in(
     session_service: SessionService,
 ) -> AppResponse {
     if let Some(identity) = session_service.identity.identity() {
-        if let Some(_) = session_service.session.get::<SessionUser>(&identity)? {
+        if let Some(_) = session_service.session.get::<SessionAccount>(&identity)? {
             let msg = String::from("Ты чё? Ты уже в системе");
             return Err(AppError::BAD_REQUEST.message(msg));
         }
     }
     let (account, role) = service.sign_in(dto.clone()).await?;
-    let session_user = SessionUser::new(account.email.clone(), account, role, session_service.ip);
+    let session_user =
+        SessionAccount::new(account.email.clone(), account, role, session_service.ip);
     let session_id = session_user.session_id.clone();
 
     session_service.identity.remember(session_id.clone());
@@ -34,7 +35,7 @@ pub async fn sign_in(
         .session
         .insert(session_id, session_user.clone())?;
 
-    Ok(ClientResponse::<SessionUser>::build()
+    Ok(ClientResponse::<SessionAccount>::build()
         .with_data(session_user)
         .send())
 }
@@ -44,7 +45,7 @@ pub async fn sign_out(session_service: SessionService) -> AppResponse {
         session_service.identity.forget();
         if let Some(user) = session_service.session.remove(&session_id) {
             warn!("logout user: {:?}", user);
-            return Ok(ClientResponse::<SessionUser>::build()
+            return Ok(ClientResponse::<SessionAccount>::build()
                 .with_message(format!("logout user: {:?}", user))
                 .send());
         }
@@ -58,13 +59,14 @@ pub async fn registration(
     session_service: SessionService,
 ) -> AppResponse {
     if let Some(identity) = session_service.identity.identity() {
-        if let Some(_) = session_service.session.get::<SessionUser>(&identity)? {
+        if let Some(_) = session_service.session.get::<SessionAccount>(&identity)? {
             let msg = String::from("Ты чё? Ты уже в системе");
             return Err(AppError::BAD_REQUEST.message(msg));
         }
     }
     let (account, role) = service.registration(dto.clone()).await?;
-    let session_user = SessionUser::new(account.email.clone(), account, role, session_service.ip);
+    let session_user =
+        SessionAccount::new(account.email.clone(), account, role, session_service.ip);
     let session_id = session_user.session_id.clone();
 
     session_service.identity.remember(session_id.clone());
@@ -72,7 +74,7 @@ pub async fn registration(
         .session
         .insert(session_id, session_user.clone())?;
 
-    Ok(ClientResponse::<SessionUser>::build()
+    Ok(ClientResponse::<SessionAccount>::build()
         .with_data(session_user)
         .send())
 }
@@ -86,8 +88,8 @@ pub async fn session_info(session_service: SessionService) -> AppResponse {
         warn!("Key session: {:?}", item);
     }
     if let Some(identity) = session_service.identity.identity() {
-        if let Some(data) = session_service.session.get::<SessionUser>(&identity)? {
-            return Ok(ClientResponse::<SessionUser>::build()
+        if let Some(data) = session_service.session.get::<SessionAccount>(&identity)? {
+            return Ok(ClientResponse::<SessionAccount>::build()
                 .with_data(data)
                 .send());
         }

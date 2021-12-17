@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Pagination {
     pub limit: i64,
