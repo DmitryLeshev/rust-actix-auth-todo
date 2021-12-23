@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use actix_web::{http::StatusCode, HttpResponse};
+use actix_web::{cookie::Cookie, http::StatusCode, HttpResponse, Responder};
 use serde::Serialize;
 use tracing::{error, info, warn};
 
@@ -82,6 +82,13 @@ impl<T: Debug + Serialize + Clone> ClientResponse<T> {
         } else {
             error!("{:?}", self);
         };
-        HttpResponse::build(status_code).json(self)
+        HttpResponse::build(status_code)
+            .insert_header((
+                "set-cookie",
+                "test=working; Path=/;Expires=Wed, 21 Oct 2022 07:28:00 GMT",
+            ))
+            .json(self)
+        // .headers_mut()
+        // .insert("Set-Cookie", "TEST")
     }
 }

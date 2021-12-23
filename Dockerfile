@@ -1,7 +1,6 @@
-FROM debian:bullseye-slim
+FROM alpine:3.8
 WORKDIR /app
-ADD target/release/server .
-CMD ["/app/server" ]
 
-# ADD ../db .
-# CMD ["/app/server", "sh db/setup.sh"]
+ADD target/release/server .
+
+CMD ["/app/server" ]
